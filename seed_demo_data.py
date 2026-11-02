@@ -51,10 +51,13 @@ DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "satur
 def upsert_user(email, password, full_name, role, *, superuser=False):
     user = User.objects.filter(email=email).first()
     if user is None:
+        # The server may already hold this username under a different email
+        placeholder = User(email=email)
+        placeholder.set_unique_username()
         if superuser:
-            user = User.objects.create_superuser(email=email, password=password, username=email.split("@")[0])
+            user = User.objects.create_superuser(email=email, password=password, username=placeholder.username)
         else:
-            user = User.objects.create_user(email=email, password=password, username=email.split("@")[0], role=role)
+            user = User.objects.create_user(email=email, password=password, username=placeholder.username, role=role)
     else:
         user.set_password(password)
         user.role = role
