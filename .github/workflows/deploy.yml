@@ -1,0 +1,49 @@
+name: Deploy Backend to Server
+
+on:
+  push:
+    branches:
+      - staging
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            set -e
+            echo "🚀 Starting deployment on server..."
+            cd /root/backend/barberbay || cd ~/backend/barberbay
+
+            echo "📥 Fetching and pulling latest code for branch: ${{ github.ref_name }}..."
+            git fetch origin
+            git checkout ${{ github.ref_name }}
+            git pull origin ${{ github.ref_name }}
+
+            echo "🐳 Rebuilding and restarting Docker containers..."
+            docker compose down || true
+            docker compose up -d --build
+
+            echo "⏳ Waiting for database and services to become healthy..."
+            sleep 8
+
+            echo "🗄️ Running migrations..."
+            docker compose exec -T web python manage.py migrate --no-input || true
+
+            echo "📦 Collecting static files..."
+            docker compose exec -T web python manage.py collectstatic --no-input || true
+
+            echo "🔍 Checking container status..."
+            docker compose ps
+
+            echo "✅ Deployment completed successfully!"

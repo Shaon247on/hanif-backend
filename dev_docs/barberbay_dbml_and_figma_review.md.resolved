@@ -1,0 +1,304 @@
+// ==========================================
+// USER ACCOUNTS & ROLES (Admin, Staff, User)
+// ==========================================
+
+Table users {
+  id int [pk, increment]
+  username varchar [unique, not null]
+  email varchar [unique, not null]
+  phone varchar [unique, not null]
+  address varchar [null]
+  password_hash varchar [not null]
+  role varchar [default: 'customer', note: 'customer | barber | admin']
+  avatar_url varchar
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table location_services{
+  id int [pk, increment]
+  user_id int [ref: > users.id]
+  location_name varchar [null]
+  location_link varchar [null]
+}
+
+// ==========================================
+// 1. SHOP & SHOP DETAILS
+// ==========================================
+
+Table shops {
+  id int [pk, increment]
+  owner_id int [ref: > users.id, note: 'Shop Owner / Admin']
+  name varchar [not null]
+  slug varchar [unique, not null]
+  logo_url varchar
+  cover_image_url varchar
+  phone varchar [not null]
+  email varchar [not null]
+  about_us text
+  address varchar [not null]
+  city varchar [not null]
+  state varchar
+  postal_code varchar
+  latitude decimal(10, 8)
+  longitude decimal(11, 8)
+  cancellation_policy text
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+}
+
+
+// 8. Business Hours
+Table business_hours {
+  id int [pk, increment]
+  shop_id int [ref: > shops.id]
+  day_of_week int [not null, note: '0=Sunday, 1=Monday ... 6=Saturday']
+  open_time time
+  close_time time
+  is_closed boolean [default: false]
+}
+
+// 7. Social Media Link
+Table social_media_links {
+  id int [pk, increment]
+  shop_id int [ref: > shops.id]
+  platform_name varchar [not null, note: 'facebook | instagram | tiktok | whatsapp | twitter']
+  url varchar [not null]
+}
+
+// 4. Shop Gallery
+Table shop_gallery {
+  id int [pk, increment]
+  shop_id int [ref: > shops.id]
+  image_url varchar [not null]
+  caption varchar
+  display_order int [default: 0]
+  uploaded_at timestamp [default: `now()`]
+}
+
+// ==========================================
+// 2. BARBERS (STAFF) & 18. BARBER SHIFTS
+// ==========================================
+
+// 2. Barbers
+Table barbers {
+  id int [pk, increment]
+  user_id int [unique, ref: - users.id, note: 'Linked to User profile with barber role']
+  shop_id int [ref: > shops.id]
+  specialty varchar
+  bio text
+  experience_years int [default: 0]
+  is_available boolean [default: true]
+  commission_rate decimal(5, 2) [default: 0.00]
+}
+
+
+// 18a. Barber Shifts (Recurring Weekly Working Hours or Date-specific Overrides)
+Table barber_shifts {
+  id int [pk, increment]
+  barber_id int [ref: > barbers.id]
+  day_of_week int [null, note: '0=Sun, 1=Mon... 6=Sat. Used for recurring weekly schedules']
+  shift_date date [null, note: 'Specific date override if schedule changes for a single day']
+  start_time time [not null]
+  end_time time [not null]
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    (barber_id, day_of_week) [note: 'For fast lookup of weekly working schedule']
+    (barber_id, shift_date) [note: 'For fast lookup of single date overrides']
+  }
+}
+
+// 18b. Barber Breaks (Daily Recurring Breaks or Single-day Custom Breaks)
+Table barber_breaks {
+  id int [pk, increment]
+  barber_id int [ref: > barbers.id]
+  day_of_week int [null, note: 'Null if this break is for a specific date only']
+  break_date date [null, note: 'Null if recurring weekly daily break (like everyday lunch)']
+  start_time time [not null, note: 'e.g., 13:00 for lunch']
+  end_time time [not null, note: 'e.g., 14:00 for lunch']
+  title varchar [default: 'lunch', note: 'lunch | tea | prayer | custom_errand']
+  is_active boolean [default: true]
+}
+
+// 18c. Barber Time Off / Leaves (Full Day & Partial Hours Leave Requests)
+Table barber_time_offs {
+  id int [pk, increment]
+  barber_id int [ref: > barbers.id]
+  start_date date [not null]
+  end_date date [not null, note: 'Same as start_date if taking leave for a single day']
+  is_full_day boolean [default: true, note: 'True for full day off, false for partial time off']
+  start_time time [null, note: 'Required ONLY if is_full_day=false (partial time off)']
+  end_time time [null, note: 'Required ONLY if is_full_day=false (partial time off)']
+  reason text [not null, note: 'Sick leave, personal emergency, vacation etc.']
+  status varchar [default: 'pending', note: 'pending | approved | rejected | cancelled']
+  reviewed_by_admin_id int [ref: > users.id, null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+
+// ==========================================
+// 6. SERVICES & 17. SERVICES CATEGORY
+// ==========================================
+
+// 17. Services Category
+Table service_categories {
+  id int [pk, increment]
+  shop_id int [ref: > shops.id]
+  name varchar [not null, note: 'Haircuts | Beard | Styling | Facial']
+  icon_url varchar
+  display_order int [default: 0]
+  is_active boolean [default: true]
+}
+
+// 6. Services
+Table services {
+  id int [pk, increment]
+  category_id int [ref: > service_categories.id]
+  shop_id int [ref: > shops.id]
+  name varchar [not null]
+  description text
+  price decimal(10, 2) [not null]
+  duration_minutes int [not null, default: 30]
+  is_active boolean [default: true]
+}
+
+// Linking table for Barbers & Services they perform
+Table barber_services {
+  id int [pk, increment]
+  barber_id int [ref: > barbers.id]
+  service_id int [ref: > services.id]
+  custom_price decimal(10, 2) [null, note: 'Override base price if needed']
+
+  indexes {
+    (barber_id, service_id) [unique]
+  }
+}
+
+// ==========================================
+// 9. BOOKINGS & 10. APPOINTMENTS & 11. REFUND
+// ==========================================
+
+// 9. Booking (Transaction & Order Container)
+Table bookings {
+  id int [pk, increment]
+  booking_code varchar [unique, not null, note: 'e.g. BB-2026-X99']
+  customer_id int [ref: > users.id]
+  shop_id int [ref: > shops.id]
+  total_amount decimal(10, 2) [not null]
+  payment_method varchar [note: 'card | cash | mobile_banking']
+  payment_status varchar [default: 'pending', note: 'pending | paid | failed | refunded']
+  status varchar [default: 'pending', note: 'pending | confirmed | cancelled | completed']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+// 10. Appointments (Specific scheduled slot inside a booking)
+Table appointments {
+  id int [pk, increment]
+  booking_id int [ref: > bookings.id]
+  service_id int [ref: > services.id]
+  barber_id int [ref: > barbers.id]
+  appointment_date date [not null]
+  start_time time [not null]
+  end_time time [not null]
+  price decimal(10, 2) [not null]
+  status varchar [default: 'scheduled', note: 'scheduled | in_progress | completed | no_show | cancelled']
+  notes text
+}
+
+// 11. Refund
+Table refunds {
+  id int [pk, increment]
+  booking_id int [ref: > bookings.id]
+  customer_id int [ref: > users.id]
+  refund_amount decimal(10, 2) [not null]
+  reason text [not null]
+  status varchar [default: 'requested', note: 'requested | approved | rejected | processed']
+  created_at timestamp [default: `now()`]
+  processed_at timestamp [null]
+}
+
+// ==========================================
+// 3. SHOP REVIEW
+// ==========================================
+
+// 3. Shop Review
+Table shop_reviews {
+  id int [pk, increment]
+  shop_id int [ref: > shops.id]
+  customer_id int [ref: > users.id]
+  booking_id int [unique, ref: - bookings.id, note: 'Ensure verified review per booking']
+  rating int [not null, note: '1 to 5 stars']
+  comment text
+  created_at timestamp [default: `now()`]
+}
+
+// ==========================================
+// SYSTEM: NOTIFICATION, SETTING, PAGES, CONTACT
+// ==========================================
+
+// 15. Notification
+Table notifications {
+  id int [pk, increment]
+  user_id int [ref: > users.id]
+  title varchar [not null]
+  message text [not null]
+  type varchar [note: 'booking | promotion | reminder | system']
+  is_read boolean [default: false]
+  created_at timestamp [default: `now()`]
+}
+
+// 16. Setting (payment off/on, Notification On/Off)
+Table settings {
+  id int [pk, increment]
+  user_id int [unique, ref: - users.id, null, note: 'Null if global/shop setting']
+  shop_id int [unique, ref: - shops.id, null, note: 'Null if user setting']
+  payment_gateway_enabled boolean [default: true]
+  push_notifications_enabled boolean [default: true]
+  email_notifications_enabled boolean [default: true]
+  sms_notifications_enabled boolean [default: false]
+  auto_confirm_bookings boolean [default: true]
+  dark_mode_enabled boolean [default: true]
+  updated_at timestamp [default: `now()`]
+}
+
+// 12. Cont (Contact Us / Support Inquiries)
+Table contacts {
+  id int [pk, increment]
+  name varchar [not null]
+  email varchar [not null]
+  phone varchar
+  subject varchar
+  message text [not null]
+  is_resolved boolean [default: false]
+  submitted_at timestamp [default: `now()`]
+}
+
+// 13. Terms and Condition
+Table terms_and_conditions {
+  id int [pk, increment]
+  version varchar [unique, not null, note: 'e.g. v1.0']
+  title varchar [not null]
+  content text [not null]
+  is_published boolean [default: false]
+  effective_date date [not null]
+  updated_at timestamp [default: `now()`]
+}
+
+// 14. Privacy Policy
+Table privacy_policies {
+  id int [pk, increment]
+  version varchar [unique, not null, note: 'e.g. v1.0']
+  title varchar [not null]
+  content text [not null]
+  is_published boolean [default: false]
+  effective_date date [not null]
+  updated_at timestamp [default: `now()`]
+}
+
+
+Ref: "settings"."id" < "settings"."user_id"

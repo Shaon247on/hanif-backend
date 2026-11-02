@@ -1,0 +1,7 @@
+# =============================================================================
+# Production dependencies
+# =============================================================================
+-r base.txt
+
+# Error monitoring (optional — configure SENTRY_DSN in .env)
+sentry-sdk[django]>=2.0,<3.0
